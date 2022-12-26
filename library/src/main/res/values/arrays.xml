@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="search_engine_names">
+        <item>Google</item>
+        <item>Bing</item>
+        <item>Yahoo</item>
+        <item>DuckDuckGo</item>
+    </string-array>
+    <string-array name="search_engine_urls">
+        <item>https://www.google.com/search?q=%s</item>
+        <item>https://www.bing.com/search?q=%s</item>
+        <item>https://search.yahoo.com/search?p=%s</item>
+        <item>https://duckduckgo.com/?q=%s</item>
+    </string-array>
+</resources>
