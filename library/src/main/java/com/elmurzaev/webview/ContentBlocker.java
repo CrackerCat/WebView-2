@@ -34,11 +34,17 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
 
+/**
+ * This class is used to hold hosts that should be blocked by {@link WebView}.
+ * */
 public class ContentBlocker {
 
     private final Set<String> blockedList = new HashSet<>();
     private final Set<String> whiteList = new HashSet<>();
 
+    /**
+     * @param stream used to prepopulate block list.
+     * */
     public ContentBlocker(@NonNull InputStream stream) {
         try {
             BufferedReader reader = new BufferedReader(new InputStreamReader(stream));
@@ -51,16 +57,29 @@ public class ContentBlocker {
         }
     }
 
-    public void addToWhiteList(String... host) {
+    /**
+     * Add {@code host} to whitelist. It will not be
+     * blocked if it's in this list, even if it's
+     * currently in the blocklist.
+     * */
+    public void whiteList(String... host) {
         whiteList.addAll(Arrays.asList(host));
     }
 
+    /**
+     * Remove {@code host} from whitelist if it was previously
+     * added to it by {@link #whiteList(String...)}
+     * */
     public void removeFromWhiteList(@NonNull String... host) {
         for (String s : host) {
             whiteList.remove(s);
         }
     }
 
+    /**
+     * @return true if {@code host} is blocked and not
+     * included in the whitelist.
+     * */
     public boolean isBlocked(String host) {
         return blockedList.contains(host) && !whiteList.contains(host);
     }

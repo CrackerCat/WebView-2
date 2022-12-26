@@ -91,7 +91,7 @@ public class WebView extends android.webkit.WebView implements DefaultLifecycleO
     @Nullable
     private ContentBlocker mContentBlocker;
     @NonNull
-    private String mSearchEngine = "https://www.google.com/search?q=%s";
+    private String mSearchEngine = "Google";
     @NonNull
     private String mUserAgentDesktop = "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:107.0) " +
             "Gecko/20100101 Firefox/107.0";
@@ -188,7 +188,7 @@ public class WebView extends android.webkit.WebView implements DefaultLifecycleO
         }
     }
 
-    public void startDownload(@NonNull DownloadManager.Request request) {
+    private void startDownload(@NonNull DownloadManager.Request request) {
         DownloadManager dm = (DownloadManager) getContext().getSystemService(Context.DOWNLOAD_SERVICE);
         dm.enqueue(request);
     }
@@ -289,22 +289,21 @@ public class WebView extends android.webkit.WebView implements DefaultLifecycleO
     }
 
     /**
-     * If {@code desktopMode} is true, web sites will be opened using User-Agent from
-     * {@link #getDesktopUserAgent()} and some other customizations. Calling this method
-     * will cause page reload;
+     * If {@code mode} is true, web sites will be opened using
+     * User-Agent from {@link #getDesktopUserAgent()} and some
+     * other customizations. Calling this method will cause page reload;
      */
-    public void setDesktopMode(boolean desktopMode) {
-        getSettings().setUserAgentString(desktopMode ? mUserAgentDesktop : null);
-        getSettings().setLoadWithOverviewMode(desktopMode);
-        getSettings().setUseWideViewPort(!desktopMode);
+    public void setDesktopMode(boolean mode) {
+        getSettings().setUserAgentString(mode ? mUserAgentDesktop : null);
+        getSettings().setLoadWithOverviewMode(mode);
+        getSettings().setUseWideViewPort(!mode);
         setInitialScale(100);
         reload();
     }
 
     /**
-     * @param url can be exact url with or without protocol prefix or may also be a search query,
-     *            in which case a url from {@link #getSearchEngine()} will be opened with {@code url}
-     *            placed in it.
+     * @param url can be exact url with or without protocol prefix or may also be
+     *            a search query, in which case a search request will be issued.
      */
     @Override
     public void loadUrl(@NonNull String url) {

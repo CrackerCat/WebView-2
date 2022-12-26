@@ -31,6 +31,12 @@ import androidx.annotation.NonNull;
 
 public final class SearchEngines {
 
+    /**
+     * @param context required to access resources.
+     * @param searchEngine name of the search engine, such as 'google'.
+     * @param query search query.
+     * @return url for making search requests.
+     * */
     @NonNull
     public static String getSearchUrlFor(@NonNull Context context,
                                          @NonNull String searchEngine,
