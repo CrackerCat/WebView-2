@@ -1,3 +1,27 @@
+/*
+ * MIT License
+ *
+ * Copyright (c) 2022 Ramzan Elmurzaev
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+
 package com.elmurzaev.webview;
 
 import android.Manifest;
@@ -28,7 +52,6 @@ import android.webkit.WebResourceRequest;
 import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebStorage;
-import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.ProgressBar;
 import android.widget.Toast;
@@ -48,33 +71,33 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.regex.Pattern;
 
-public class CoreWebView extends WebView implements DefaultLifecycleObserver, DownloadListener {
+public class WebView extends android.webkit.WebView implements DefaultLifecycleObserver, DownloadListener {
 
-    private static final int RC_DOWNLOAD_FILE = 10;
-    private static final int RC_GEO_PERMISSION = 11;
-    private static final int RC_FILE_CHOOSER = 12;
-    private static final int RC_WEB_PERMISSIONS = 13;
+    public static final int RC_DOWNLOAD_FILE = 10;
+    public static final int RC_GEO_PERMISSION = 11;
+    public static final int RC_FILE_CHOOSER = 12;
+    public static final int RC_WEB_PERMISSIONS = 13;
 
+    @Nullable
+    private DownloadManager.Request mPendingDownloadRequest;
+    @Nullable
+    private ValueCallback<Boolean> mGeoPermissionCallback;
+    @Nullable
+    private ValueCallback<Uri[]> mFileChooserCallback;
+    @Nullable
+    private ProgressBar mProgressBar;
+    @Nullable
+    private PermissionRequest mPermissionRequest;
+    @Nullable
+    private ContentBlocker mContentBlocker;
     @NonNull
-    private String userAgentDesktop = "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:107.0) Gecko/20100101 Firefox/107.0";
+    private String mSearchEngine = "https://www.google.com/search?q=%s";
     @NonNull
-    private String searchEngine = "https://www.google.com/search?q=%s";
-    @Nullable
-    private DownloadManager.Request pendingDownloadRequest;
-    @Nullable
-    private ValueCallback<Boolean> geoPermissionCallback;
-    @Nullable
-    private ValueCallback<Uri[]> fileChooserCallback;
-    @Nullable
-    private ProgressBar progressBar;
-    @Nullable
-    private PermissionRequest permissionRequest;
-    private ContentBlocker contentBlocker = new ContentBlocker();
+    private String mUserAgentDesktop = "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:107.0) " +
+            "Gecko/20100101 Firefox/107.0";
+    private boolean mDesignMode;
 
-    private boolean isDesignMode;
-    private boolean isContentBlockerEnabled;
-
-    public CoreWebView(@NonNull Context context) {
+    public WebView(@NonNull Context context) {
         this(context, null);
         setLayoutParams(new ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -82,7 +105,7 @@ public class CoreWebView extends WebView implements DefaultLifecycleObserver, Do
         );
     }
 
-    public CoreWebView(@NonNull Context context, @Nullable AttributeSet attrs) {
+    public WebView(@NonNull Context context, @Nullable AttributeSet attrs) {
         super(context, attrs);
         if (isInEditMode()) {
             return;
@@ -117,20 +140,12 @@ public class CoreWebView extends WebView implements DefaultLifecycleObserver, Do
         }
     }
 
-    public boolean isContentBlockerEnabled() {
-        return isContentBlockerEnabled;
-    }
-
-    public void setContentBlockerEnabled(boolean contentBlockerEnabled) {
-        isContentBlockerEnabled = contentBlockerEnabled;
-    }
-
     public static boolean isLocalHost(@NonNull String s) {
         return Pattern.matches("(?:https?://)?localhost(?::\\d+)?(?![^/])", s);
     }
 
-    public void setContentBlocker(@NonNull ContentBlocker blocker) {
-        contentBlocker = blocker;
+    public void setContentBlocker(@Nullable ContentBlocker blocker) {
+        mContentBlocker = blocker;
     }
 
     @Override
@@ -157,7 +172,7 @@ public class CoreWebView extends WebView implements DefaultLifecycleObserver, Do
                     .addRequestHeader("Cookie", CookieManager.getInstance().getCookie(url))
                     .setMimeType(mimetype)
                     .setTitle(fileName)
-                    .setDescription("Downloading file")
+                    .setDescription(getContext().getString(R.string.downloading))
                     .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
                     .setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName);
             request.allowScanningByMediaScanner();
@@ -166,7 +181,7 @@ public class CoreWebView extends WebView implements DefaultLifecycleObserver, Do
                     || Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 startDownload(request);
             } else {
-                pendingDownloadRequest = request;
+                mPendingDownloadRequest = request;
                 ActivityCompat.requestPermissions((Activity) getContext(),
                         new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE}, RC_DOWNLOAD_FILE);
             }
@@ -182,8 +197,8 @@ public class CoreWebView extends WebView implements DefaultLifecycleObserver, Do
         switch (requestCode) {
             case RC_FILE_CHOOSER:
                 Uri[] result = WebChromeClient.FileChooserParams.parseResult(resultCode, data);
-                if (fileChooserCallback != null) {
-                    fileChooserCallback.onReceiveValue(result);
+                if (mFileChooserCallback != null) {
+                    mFileChooserCallback.onReceiveValue(result);
                 }
                 break;
         }
@@ -191,23 +206,23 @@ public class CoreWebView extends WebView implements DefaultLifecycleObserver, Do
 
     @NonNull
     public String getDesktopUserAgent() {
-        return userAgentDesktop;
+        return mUserAgentDesktop;
     }
 
     public void setDesktopUserAgent(@NonNull String desktopUserAgent) {
-        userAgentDesktop = desktopUserAgent;
+        mUserAgentDesktop = desktopUserAgent;
     }
 
     @NonNull
     public String getSearchEngine() {
-        return searchEngine;
+        return mSearchEngine;
     }
 
     /**
      * @param engine search engine name. For example: Google
      */
     public void setSearchEngine(@NonNull String engine) {
-        this.searchEngine = engine;
+        this.mSearchEngine = engine;
     }
 
     public String getUserAgent() {
@@ -219,7 +234,7 @@ public class CoreWebView extends WebView implements DefaultLifecycleObserver, Do
     }
 
     public boolean isDesignMode() {
-        return isDesignMode;
+        return mDesignMode;
     }
 
     public void setDesignMode(boolean designMode) {
@@ -228,7 +243,7 @@ public class CoreWebView extends WebView implements DefaultLifecycleObserver, Do
         } else {
             execJs("document.designMode='off'");
         }
-        this.isDesignMode = designMode;
+        this.mDesignMode = designMode;
     }
 
     /**
@@ -245,7 +260,8 @@ public class CoreWebView extends WebView implements DefaultLifecycleObserver, Do
      */
     public synchronized void clearAllData(@Nullable ValueCallback<Boolean> callback) {
         WebStorage.getInstance().deleteAllData();
-        CookieManager.getInstance().removeAllCookies(cleared -> {
+        CookieManager.getInstance().removeAllCookies(cleared ->
+        {
             if (cleared) {
                 CookieManager.getInstance().flush();
             }
@@ -278,7 +294,7 @@ public class CoreWebView extends WebView implements DefaultLifecycleObserver, Do
      * will cause page reload;
      */
     public void setDesktopMode(boolean desktopMode) {
-        getSettings().setUserAgentString(desktopMode ? userAgentDesktop : null);
+        getSettings().setUserAgentString(desktopMode ? mUserAgentDesktop : null);
         getSettings().setLoadWithOverviewMode(desktopMode);
         getSettings().setUseWideViewPort(!desktopMode);
         setInitialScale(100);
@@ -297,39 +313,39 @@ public class CoreWebView extends WebView implements DefaultLifecycleObserver, Do
         } else if (Patterns.WEB_URL.matcher(url).matches() || isLocalHost(url)) {
             super.loadUrl("http://" + url);
         } else {
-            super.loadUrl(SearchEngines.getSearchUrlFor(getContext(), searchEngine, url));
+            super.loadUrl(SearchEngines.getSearchUrlFor(getContext(), mSearchEngine, url));
         }
     }
 
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
         switch (requestCode) {
             case RC_GEO_PERMISSION:
-                if (geoPermissionCallback != null) {
-                    geoPermissionCallback.onReceiveValue(grantResults[0]== PackageManager.PERMISSION_GRANTED);
+                if (mGeoPermissionCallback != null) {
+                    mGeoPermissionCallback.onReceiveValue(grantResults[0] == PackageManager.PERMISSION_GRANTED);
                 }
                 break;
             case RC_DOWNLOAD_FILE:
-                if (grantResults[0] == PackageManager.PERMISSION_GRANTED && pendingDownloadRequest != null) {
-                    startDownload(pendingDownloadRequest);
+                if (grantResults[0] == PackageManager.PERMISSION_GRANTED && mPendingDownloadRequest != null) {
+                    startDownload(mPendingDownloadRequest);
                 }
                 break;
             case RC_WEB_PERMISSIONS:
                 for (int result : grantResults) {
                     if (result == PackageManager.PERMISSION_DENIED) {
-                        if (permissionRequest != null) {
-                            permissionRequest.deny();
+                        if (mPermissionRequest != null) {
+                            mPermissionRequest.deny();
                         }
                         break;
                     }
                 }
-                if (permissionRequest != null) {
-                    permissionRequest.grant(permissionRequest.getResources());
+                if (mPermissionRequest != null) {
+                    mPermissionRequest.grant(mPermissionRequest.getResources());
                 }
         }
     }
 
-    public void setProgressBar(ProgressBar progressBar) {
-        this.progressBar = progressBar;
+    public void setProgressBar(@NonNull ProgressBar progressBar) {
+        mProgressBar = progressBar;
     }
 
     public class ChromeClient extends WebChromeClient {
@@ -346,10 +362,10 @@ public class CoreWebView extends WebView implements DefaultLifecycleObserver, Do
         }
 
         @Override
-        public void onProgressChanged(WebView view, int newProgress) {
+        public void onProgressChanged(android.webkit.WebView view, int newProgress) {
             super.onProgressChanged(view, newProgress);
-            if (progressBar != null) {
-                progressBar.setProgress(newProgress);
+            if (mProgressBar != null) {
+                mProgressBar.setProgress(newProgress);
             }
         }
 
@@ -376,11 +392,13 @@ public class CoreWebView extends WebView implements DefaultLifecycleObserver, Do
         }
 
         @Override
-        public void onGeolocationPermissionsShowPrompt(String origin, GeolocationPermissions.Callback callback) {
+        public void onGeolocationPermissionsShowPrompt(String origin,
+                                                       GeolocationPermissions.Callback callback) {
             super.onGeolocationPermissionsShowPrompt(origin, callback);
             new AlertDialog.Builder(getContext())
-                    .setMessage(origin + " wants to access your location.")
-                    .setPositiveButton("Grant", (dialog, which) -> {
+                    .setMessage(getContext().getString(R.string.request_for_location, origin))
+                    .setPositiveButton(R.string.grant, (dialog, which) ->
+                    {
                         if (hasPermission(Manifest.permission.ACCESS_FINE_LOCATION)) {
                             callback.invoke(origin, true, true);
                         } else {
@@ -389,12 +407,11 @@ public class CoreWebView extends WebView implements DefaultLifecycleObserver, Do
                                             Manifest.permission.ACCESS_FINE_LOCATION,
                                             Manifest.permission.ACCESS_COARSE_LOCATION},
                                     RC_GEO_PERMISSION);
-                            geoPermissionCallback = grant -> callback.invoke(origin, grant, grant);
+                            mGeoPermissionCallback = grant -> callback.invoke(origin, grant, grant);
                         }
                     })
-                    .setNegativeButton("Discard", (dialog, which) -> {
-                        callback.invoke(origin, false, false);
-                    })
+                    .setNegativeButton(R.string.discard, (dialog, which) ->
+                            callback.invoke(origin, false, false))
                     .setCancelable(false)
                     .show();
         }
@@ -402,14 +419,15 @@ public class CoreWebView extends WebView implements DefaultLifecycleObserver, Do
         @Override
         public void onGeolocationPermissionsHidePrompt() {
             super.onGeolocationPermissionsHidePrompt();
-            geoPermissionCallback = null;
-            Toast.makeText(activity, "Geo permission denied!", Toast.LENGTH_SHORT).show();
+            mGeoPermissionCallback = null;
+            Toast.makeText(activity, R.string.permission_denied, Toast.LENGTH_SHORT).show();
         }
 
         @Override
-        public boolean onShowFileChooser(WebView webView, ValueCallback<Uri[]> filePathCallback,
+        public boolean onShowFileChooser(android.webkit.WebView webView,
+                                         ValueCallback<Uri[]> filePathCallback,
                                          @NonNull FileChooserParams fileChooserParams) {
-            fileChooserCallback = filePathCallback;
+            mFileChooserCallback = filePathCallback;
 
             Intent intent = fileChooserParams.createIntent();
             activity.startActivityForResult(intent, RC_FILE_CHOOSER);
@@ -434,7 +452,7 @@ public class CoreWebView extends WebView implements DefaultLifecycleObserver, Do
                 }
             }
             if (!permissions.isEmpty()) {
-                permissionRequest = request;
+                mPermissionRequest = request;
                 ActivityCompat.requestPermissions(activity,
                         permissions.toArray(new String[]{}), RC_WEB_PERMISSIONS);
             } else {
@@ -446,24 +464,25 @@ public class CoreWebView extends WebView implements DefaultLifecycleObserver, Do
     public class WebClient extends WebViewClient {
 
         @Override
-        public void onPageStarted(WebView view, String url, Bitmap favicon) {
+        public void onPageStarted(android.webkit.WebView view, String url, Bitmap favicon) {
             super.onPageStarted(view, url, favicon);
-            if (progressBar != null) {
-                progressBar.setVisibility(View.VISIBLE);
+            if (mProgressBar != null) {
+                mProgressBar.setVisibility(View.VISIBLE);
             }
 
         }
 
         @Override
-        public void onPageFinished(WebView view, String url) {
+        public void onPageFinished(android.webkit.WebView view, String url) {
             super.onPageFinished(view, url);
-            if (progressBar != null) {
-                progressBar.setVisibility(View.GONE);
+            if (mProgressBar != null) {
+                mProgressBar.setVisibility(View.GONE);
             }
         }
 
         @Override
-        public boolean shouldOverrideUrlLoading(@NonNull WebView view, @NonNull WebResourceRequest request) {
+        public boolean shouldOverrideUrlLoading(@NonNull android.webkit.WebView view,
+                                                @NonNull WebResourceRequest request) {
             if (!URLUtil.isNetworkUrl(request.getUrl().toString())) {
                 try {
                     Intent intent = new Intent(Intent.parseUri(request.getUrl().toString(), 0));
@@ -478,9 +497,9 @@ public class CoreWebView extends WebView implements DefaultLifecycleObserver, Do
 
         @Nullable
         @Override
-        public WebResourceResponse shouldInterceptRequest(WebView view, String url) {
-            if (url != null && isContentBlockerEnabled
-                    && contentBlocker.isBlocked(Uri.parse(url).getHost())) {
+        public WebResourceResponse shouldInterceptRequest(android.webkit.WebView view, String url) {
+            if (url != null && mContentBlocker != null
+                    && mContentBlocker.isBlocked(Uri.parse(url).getHost())) {
                 return new WebResourceResponse("text/html", null, null);
             }
             return super.shouldInterceptRequest(view, url);
