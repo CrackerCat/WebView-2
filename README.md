@@ -49,14 +49,16 @@ Include in your layout.
 In your Activity.
 ```java
 WebView webView = findViewById(R.id.webView);
+// no configuration needed like enabling javascript etc.
+// everything is configuried for you, just load your url.
 webView.loadUrl("https://example.com");
 ```
 Also you need to add this in your Activity:
 ```java
 // in onRequestPermissionsResult method
-mWebView.onRequestPermissionsResult(requestCode, permissions, grantResults);
+webView.onRequestPermissionsResult(requestCode, permissions, grantResults);
 // in onActivityResult method
-mWebView.onActivityResult(requestCode, resultCode, data);
+webView.onActivityResult(requestCode, resultCode, data);
 ```
 
 ## License
