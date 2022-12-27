@@ -47,7 +47,6 @@ import android.webkit.GeolocationPermissions;
 import android.webkit.PermissionRequest;
 import android.webkit.URLUtil;
 import android.webkit.ValueCallback;
-import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
@@ -71,7 +70,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.regex.Pattern;
 
-public class WebView extends android.webkit.WebView implements DefaultLifecycleObserver, DownloadListener {
+public class WebView extends NestedWebView implements DefaultLifecycleObserver, DownloadListener {
 
     public static final int RC_DOWNLOAD_FILE = 10;
     public static final int RC_GEO_PERMISSION = 11;
@@ -110,8 +109,8 @@ public class WebView extends android.webkit.WebView implements DefaultLifecycleO
         if (isInEditMode()) {
             return;
         }
-        setWebViewClient(new WebClient());
-        setWebChromeClient(new ChromeClient());
+        setWebViewClient(new WebViewClient());
+        setWebChromeClient(new WebChromeClient());
         setDownloadListener(this);
 
         getSettings().setJavaScriptEnabled(true);
@@ -140,24 +139,40 @@ public class WebView extends android.webkit.WebView implements DefaultLifecycleO
         }
     }
 
-    public static boolean isLocalHost(@NonNull String s) {
-        return Pattern.matches("(?:https?://)?localhost(?::\\d+)?(?![^/])", s);
+    /**
+     * @return true if {@code host} is localhost.
+     */
+    public static boolean isLocalHost(@NonNull String host) {
+        return Pattern.matches("(?:https?://)?localhost(?::\\d+)?(?![^/])", host);
     }
 
+    /**
+     * Set {@link ContentBlocker} if you want to block certain hosts or pass null
+     * to remove one.
+     */
     public void setContentBlocker(@Nullable ContentBlocker blocker) {
         mContentBlocker = blocker;
     }
 
+    /**
+     * You don't need to call this manually!
+     */
     @Override
     public void onPause(@NonNull LifecycleOwner owner) {
         onPause();
     }
 
+    /**
+     * You don't need to call this manually!
+     */
     @Override
     public void onResume(@NonNull LifecycleOwner owner) {
         onResume();
     }
 
+    /**
+     * You don't need to call this manually!
+     */
     @Override
     public void onDestroy(@NonNull LifecycleOwner owner) {
         destroy();
@@ -165,7 +180,8 @@ public class WebView extends android.webkit.WebView implements DefaultLifecycleO
     }
 
     @Override
-    public void onDownloadStart(String url, String userAgent, String contentDisposition, String mimetype, long contentLength) {
+    public void onDownloadStart(String url, String userAgent, String contentDisposition,
+                                String mimetype, long contentLength) {
         if (URLUtil.isNetworkUrl(url) && !Objects.equals(mimetype, "text/html")) {
             String fileName = URLUtil.guessFileName(url, contentDisposition, mimetype);
             DownloadManager.Request request = new DownloadManager.Request(Uri.parse(url))
@@ -193,6 +209,9 @@ public class WebView extends android.webkit.WebView implements DefaultLifecycleO
         dm.enqueue(request);
     }
 
+    /**
+     * Call this in your Activity's corresponding method.
+     */
     public void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
         switch (requestCode) {
             case RC_FILE_CHOOSER:
@@ -204,15 +223,24 @@ public class WebView extends android.webkit.WebView implements DefaultLifecycleO
         }
     }
 
+    /**
+     * @return User-Agent being used in 'Desktop mode'
+     */
     @NonNull
     public String getDesktopUserAgent() {
         return mUserAgentDesktop;
     }
 
+    /**
+     * Sets User-Agent to be used in 'Desktop mode'
+     */
     public void setDesktopUserAgent(@NonNull String desktopUserAgent) {
         mUserAgentDesktop = desktopUserAgent;
     }
 
+    /**
+     * @return current search engine name. For example: Google
+     */
     @NonNull
     public String getSearchEngine() {
         return mSearchEngine;
@@ -247,7 +275,7 @@ public class WebView extends android.webkit.WebView implements DefaultLifecycleO
     }
 
     /**
-     * @return true if current theme is using night mode.
+     * @return true if night mode is on.
      */
     public boolean isDarkMode() {
         int mask = getContext().getResources().getConfiguration().uiMode
@@ -316,15 +344,21 @@ public class WebView extends android.webkit.WebView implements DefaultLifecycleO
         }
     }
 
-    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+    public void onRequestPermissionsResult(
+            int requestCode,
+            String[] permissions,
+            int[] grantResults
+    ) {
         switch (requestCode) {
             case RC_GEO_PERMISSION:
                 if (mGeoPermissionCallback != null) {
-                    mGeoPermissionCallback.onReceiveValue(grantResults[0] == PackageManager.PERMISSION_GRANTED);
+                    mGeoPermissionCallback.onReceiveValue(
+                            grantResults[0] == PackageManager.PERMISSION_GRANTED);
                 }
                 break;
             case RC_DOWNLOAD_FILE:
-                if (grantResults[0] == PackageManager.PERMISSION_GRANTED && mPendingDownloadRequest != null) {
+                if (grantResults[0] == PackageManager.PERMISSION_GRANTED &&
+                        mPendingDownloadRequest != null) {
                     startDownload(mPendingDownloadRequest);
                 }
                 break;
@@ -347,16 +381,16 @@ public class WebView extends android.webkit.WebView implements DefaultLifecycleO
         mProgressBar = progressBar;
     }
 
-    public class ChromeClient extends WebChromeClient {
+    public class WebChromeClient extends android.webkit.WebChromeClient {
 
-        private final Activity activity;
+        private final Activity mActivity;
 
-        public ChromeClient() {
+        public WebChromeClient() {
             if (getContext() instanceof Activity) {
-                activity = (Activity) getContext();
+                mActivity = (Activity) getContext();
             } else {
                 Context context = ((ContextThemeWrapper) getContext()).getBaseContext();
-                activity = (Activity) context;
+                mActivity = (Activity) context;
             }
         }
 
@@ -371,7 +405,7 @@ public class WebView extends android.webkit.WebView implements DefaultLifecycleO
         @Override
         public void onShowCustomView(View view, CustomViewCallback callback) {
             super.onShowCustomView(view, callback);
-            ViewGroup decorView = (ViewGroup) activity.getWindow().getDecorView();
+            ViewGroup decorView = (ViewGroup) mActivity.getWindow().getDecorView();
             decorView.setSystemUiVisibility(View.SYSTEM_UI_FLAG_FULLSCREEN
                     | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
                     | View.SYSTEM_UI_FLAG_LAYOUT_STABLE
@@ -385,7 +419,7 @@ public class WebView extends android.webkit.WebView implements DefaultLifecycleO
         @Override
         public void onHideCustomView() {
             super.onHideCustomView();
-            ViewGroup decorView = (ViewGroup) activity.getWindow().getDecorView();
+            ViewGroup decorView = (ViewGroup) mActivity.getWindow().getDecorView();
             decorView.setSystemUiVisibility(View.SYSTEM_UI_FLAG_VISIBLE);
             decorView.removeViewAt(decorView.getChildCount() - 1);
         }
@@ -401,7 +435,7 @@ public class WebView extends android.webkit.WebView implements DefaultLifecycleO
                         if (hasPermission(Manifest.permission.ACCESS_FINE_LOCATION)) {
                             callback.invoke(origin, true, true);
                         } else {
-                            ActivityCompat.requestPermissions(activity,
+                            ActivityCompat.requestPermissions(mActivity,
                                     new String[]{
                                             Manifest.permission.ACCESS_FINE_LOCATION,
                                             Manifest.permission.ACCESS_COARSE_LOCATION},
@@ -419,7 +453,7 @@ public class WebView extends android.webkit.WebView implements DefaultLifecycleO
         public void onGeolocationPermissionsHidePrompt() {
             super.onGeolocationPermissionsHidePrompt();
             mGeoPermissionCallback = null;
-            Toast.makeText(activity, R.string.permission_denied, Toast.LENGTH_SHORT).show();
+            Toast.makeText(mActivity, R.string.permission_denied, Toast.LENGTH_SHORT).show();
         }
 
         @Override
@@ -429,7 +463,7 @@ public class WebView extends android.webkit.WebView implements DefaultLifecycleO
             mFileChooserCallback = filePathCallback;
 
             Intent intent = fileChooserParams.createIntent();
-            activity.startActivityForResult(intent, RC_FILE_CHOOSER);
+            mActivity.startActivityForResult(intent, RC_FILE_CHOOSER);
 
             return true;
         }
@@ -452,7 +486,7 @@ public class WebView extends android.webkit.WebView implements DefaultLifecycleO
             }
             if (!permissions.isEmpty()) {
                 mPermissionRequest = request;
-                ActivityCompat.requestPermissions(activity,
+                ActivityCompat.requestPermissions(mActivity,
                         permissions.toArray(new String[]{}), RC_WEB_PERMISSIONS);
             } else {
                 request.grant(request.getResources());
@@ -460,7 +494,7 @@ public class WebView extends android.webkit.WebView implements DefaultLifecycleO
         }
     }
 
-    public class WebClient extends WebViewClient {
+    public class WebViewClient extends android.webkit.WebViewClient {
 
         @Override
         public void onPageStarted(android.webkit.WebView view, String url, Bitmap favicon) {
@@ -480,11 +514,13 @@ public class WebView extends android.webkit.WebView implements DefaultLifecycleO
         }
 
         @Override
-        public boolean shouldOverrideUrlLoading(@NonNull android.webkit.WebView view,
-                                                @NonNull WebResourceRequest request) {
+        public boolean shouldOverrideUrlLoading(
+                @NonNull android.webkit.WebView view,
+                @NonNull WebResourceRequest request
+        ) {
             if (!URLUtil.isNetworkUrl(request.getUrl().toString())) {
                 try {
-                    Intent intent = new Intent(Intent.parseUri(request.getUrl().toString(), 0));
+                    Intent intent = Intent.parseUri(request.getUrl().toString(), 0);
                     view.getContext().startActivity(Intent.createChooser(intent, null));
                     return true;
                 } catch (Exception e) {
@@ -496,7 +532,10 @@ public class WebView extends android.webkit.WebView implements DefaultLifecycleO
 
         @Nullable
         @Override
-        public WebResourceResponse shouldInterceptRequest(android.webkit.WebView view, String url) {
+        public WebResourceResponse shouldInterceptRequest(
+                android.webkit.WebView view,
+                String url
+        ) {
             if (url != null && mContentBlocker != null
                     && mContentBlocker.isBlocked(Uri.parse(url).getHost())) {
                 return new WebResourceResponse("text/html", null, null);
@@ -505,7 +544,7 @@ public class WebView extends android.webkit.WebView implements DefaultLifecycleO
         }
     }
 
-    public boolean hasPermission(@NonNull String permission) {
+    private boolean hasPermission(@NonNull String permission) {
         return ContextCompat.checkSelfPermission(getContext(), permission)
                 == PackageManager.PERMISSION_GRANTED;
     }

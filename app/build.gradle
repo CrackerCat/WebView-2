@@ -27,5 +27,6 @@ android {
 }
 
 dependencies {
-    implementation 'com.github.elmurzaev:WebView:1.0'
+    implementation 'androidx.appcompat:appcompat:1.5.1'
+    implementation project(':library')
 }

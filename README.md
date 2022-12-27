@@ -4,14 +4,19 @@
 **Some of the features:**
 - Handles file downloads and uploads.
 - Handles permission requests from websites.
-- Support for dark theme on websites.
+- Supports dark theme on websites.
+- Supports desktop mode.
+- Design mode out of the box.
 - Lifecycle aware.
 - Content blocker support (Block hosts).
-- Progress bar can be attached to display a state of a website.
-- Handle malformed urls, auto prefixes hosts if they don't contain protocol.
-- Search engines for issuing search requests.
+- ProgressBar can be attached to display a state of a website. This library will control 
+it by itself, updating it's progress and hiding it after a page is loaded.
+- Handles malformed urls, auto prefixes hosts if they don't contain protocol and issues search 
+request if the url is not actually a url.
+- Built-in search engines for search requests.
 - Can play fullscreen videos.
-- Many other useful features.
+- Can scroll your AppBar.
+- Many other useful features that I might have missed to mention here.
 
 ## Download
 
@@ -31,6 +36,29 @@ dependencies {
   implementation 'com.github.elmurzaev:WebView:+'
 }
 ```
+
+## How to use
+
+Include in your layout.
+```xml
+<com.elmurzaev.webview.WebView 
+    android:id="@+id/webView"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content" />
+```
+In your Activity.
+```java
+WebView webView = findViewById(R.id.webView);
+webView.loadUrl("https://example.com");
+```
+Also you need to add this in your Activity:
+```java
+// in onRequestPermissionsResult method
+mWebView.onRequestPermissionsResult(requestCode, permissions, grantResults);
+// in onActivityResult method
+mWebView.onActivityResult(requestCode, resultCode, data);
+```
+
 ## License
 MIT License
 
